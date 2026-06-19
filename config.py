@@ -3,13 +3,21 @@ VOX Configuration
 All tuneable settings live here. Don't scatter magic strings.
 """
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # ─── LLM ──────────────────────────────────────────────────────────────────────
-LLM_MODEL = "qwen2.5:0.5b"              # Ollama model tag
-LLM_BASE_URL = "http://localhost:11434"  # Ollama server URL
+LLM_PROVIDER = "groq"                    # "groq" | "ollama"
+LLM_MODEL = "llama-3.1-8b-instant"      # Groq: sub-second responses
+LLM_OLLAMA_MODEL = "qwen2.5:0.5b"       # Fallback local model
+LLM_BASE_URL = "http://localhost:11434"  # Ollama URL (used if provider=ollama)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 LLM_TEMPERATURE = 0.7
-LLM_MAX_TOKENS = 150                     # Voice responses should be short
-LLM_NUM_CTX = 1024                       # Small context = faster inference
-LLM_NUM_THREADS = 8                      # Use all i7-9700 cores
+LLM_MAX_TOKENS = 150
+LLM_NUM_CTX = 1024
+LLM_NUM_THREADS = 8
 
 # ─── STT (faster-whisper) ────────────────────────────────────────────────────
 STT_MODEL = "tiny"           # tiny | base | small | medium | large-v3
@@ -26,7 +34,6 @@ WAKE_WORD_MODEL = "hey_jarvis"   # openWakeWord model name
 WAKE_WORD_THRESHOLD = 0.5        # Detection confidence threshold
 WAKE_WORD_ENABLED = False        # Set True once Phase 2 is wired up
 
-# ─── Audio ────────────────────────────────────────────────────────────────────
 # ─── Audio ────────────────────────────────────────────────────────────────────
 AUDIO_SAMPLE_RATE = 16000
 AUDIO_CHANNELS = 1
