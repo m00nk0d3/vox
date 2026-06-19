@@ -52,14 +52,28 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
             first         = True
             t_llm         = time.time()
 
-            for sentence in brain.think_stream(user_text, history):
-                if first:
-                    print(f"VOX [first token: {time.time() - t_llm:.1f}s]: ", end="", flush=True)
-                    first = False
-                print(sentence, end=" ", flush=True)
-                state_ref.update({"state": "speaking", "text": sentence})
-                speaker.speak(sentence)
-                full_response += sentence + " "
+            try:
+                for sentence in brain.think_stream(user_text, history):
+                    if first:
+                        print(f"VOX [first token: {time.time() - t_llm:.1f}s]: ", end="", flush=True)
+                        first = False
+                    print(sentence, end=" ", flush=True)
+                    state_ref.update({"state": "speaking", "text": sentence})
+                    speaker.speak(sentence)
+                    full_response += sentence + " "
+            except Exception as e:
+                err = str(e)
+                if "rate_limit" in err.lower() or "429" in err:
+                    msg = "rate limit hit, give me a minute"
+                else:
+                    msg = "something went wrong, try again"
+                print(f"\nError: {e}")
+                state_ref.update({"state": "speaking", "text": msg})
+                speaker.speak(msg)
+                speaker.wait_until_done()
+                go_idle()
+                session_active = False
+                continue
 
             print(f"\n  [LLM total: {time.time() - t_llm:.1f}s]")
             speaker.wait_until_done()

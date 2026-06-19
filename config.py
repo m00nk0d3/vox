@@ -10,7 +10,7 @@ load_dotenv()
 
 # ─── LLM ──────────────────────────────────────────────────────────────────────
 LLM_PROVIDER = "groq"                    # "groq" | "ollama"
-LLM_MODEL = "llama-3.3-70b-versatile"   # Groq model — better instruction following
+LLM_MODEL = "llama-3.1-8b-instant"      # Groq: 500k TPD limit
 LLM_OLLAMA_MODEL = "qwen2.5:0.5b"       # Fallback local model
 LLM_BASE_URL = "http://localhost:11434"  # Ollama URL (used if provider=ollama)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
