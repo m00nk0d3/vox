@@ -1,79 +1,39 @@
 """
 VOX — Main entry point
-Runs the voice conversation loop.
+Launches the Qt face UI and kicks off the voice worker thread.
 """
 
-import time
+import sys
+from PySide6.QtWidgets import QApplication
+
 from stt.transcriber import Transcriber
 from llm.brain import Brain
 from tts.speaker import Speaker
-from wake.detector import WakeWordDetector
 from memory.store import MemoryStore
+from ui.face import VoxWindow
+from ui.worker import VoiceWorker
 import config
 
 
 def main():
+    app = QApplication(sys.argv)
+
     print("VOX is initializing...")
-
     transcriber = Transcriber()
-    brain = Brain()
-    speaker = Speaker()
-    memory = MemoryStore()
+    brain       = Brain()
+    speaker     = Speaker()
+    memory      = MemoryStore()
 
-    # Pre-warm Ollama (only needed for local provider)
-    if config.LLM_PROVIDER == "ollama":
-        print("Warming up Ollama...")
-        _ = brain.think("hi", [])
-        print("Warm-up done.")
+    window = VoxWindow()
+    window.show()
 
-    if config.WAKE_WORD_ENABLED:
-        wake_detector = WakeWordDetector()
-        print(f"Listening for wake word: '{config.WAKE_WORD_MODEL}'")
-    else:
-        print("Wake word disabled. Press Enter to start speaking.")
+    worker = VoiceWorker(transcriber, brain, speaker, memory)
+    worker.state_changed.connect(window.set_state)
+    worker.log.connect(print)
+    worker.start()
 
-    speaker.speak("VOX online. How can I help?")
-
-    while True:
-        try:
-            if config.WAKE_WORD_ENABLED:
-                wake_detector.wait_for_wake_word()
-            else:
-                input("\n[Press Enter to speak] ")
-
-            t0 = time.time()
-            print("Listening...")
-            user_text = transcriber.listen()
-            t_stt = time.time()
-
-            if not user_text:
-                print("Didn't catch that.")
-                continue
-
-            print(f"You: {user_text}  [STT: {t_stt - t0:.1f}s]")
-
-            history = memory.get_history()
-
-            full_response = ""
-            first = True
-            t_llm_start = time.time()
-            for sentence in brain.think_stream(user_text, history):
-                if first:
-                    print(f"VOX [LLM first token: {time.time() - t_llm_start:.1f}s]: ", end="", flush=True)
-                    first = False
-                print(sentence, end=" ", flush=True)
-                speaker.speak(sentence)
-                full_response += sentence + " "
-            t_llm_end = time.time()
-            print(f"  [LLM total: {t_llm_end - t_llm_start:.1f}s]")
-
-            speaker.wait_until_done()
-            full_response = full_response.strip()
-            memory.add_turn(user_text, full_response)
-
-        except KeyboardInterrupt:
-            print("\nShutting down VOX. Later.")
-            break
+    speaker.speak("VOX online.")
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

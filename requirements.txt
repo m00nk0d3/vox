@@ -1,6 +1,3 @@
-# VOX — Local AI Voice Assistant
-# https://github.com/m00nk0d3/vox
-
 # ── Core ──────────────────────────────────────────────────────────────────────
 faster-whisper>=1.0.3
 ollama>=0.3.3
@@ -8,6 +5,11 @@ kokoro>=0.9.4
 sounddevice>=0.5.1
 numpy>=1.26.0
 pyaudio>=0.2.14
+groq>=0.9.0
+python-dotenv>=1.0.0
+
+# ── UI ─────────────────────────────────────────────────────────────────────────
+PySide6>=6.7.0
 
 # ── Wake Word (Phase 2) ───────────────────────────────────────────────────────
 openwakeword>=0.6.0
