@@ -1,39 +1,35 @@
 """
-VOX — Main entry point
-Launches the Qt face UI and kicks off the voice worker thread.
+VOX — Main entry point.
+Pygame face runs on main thread. Voice loop runs in a daemon thread.
 """
 
-import sys
-from PySide6.QtWidgets import QApplication
-
+import threading
 from stt.transcriber import Transcriber
 from llm.brain import Brain
 from tts.speaker import Speaker
 from memory.store import MemoryStore
-from ui.face import VoxWindow
-from ui.worker import VoiceWorker
-import config
+from ui.face import run_face
+from ui.worker import voice_loop
 
 
 def main():
-    app = QApplication(sys.argv)
-
     print("VOX is initializing...")
     transcriber = Transcriber()
     brain       = Brain()
     speaker     = Speaker()
     memory      = MemoryStore()
 
-    window = VoxWindow()
-    window.show()
+    state_ref = {"state": "idle", "text": "initializing..."}
 
-    worker = VoiceWorker(transcriber, brain, speaker, memory)
-    worker.state_changed.connect(window.set_state)
-    worker.log.connect(print)
-    worker.start()
+    t = threading.Thread(
+        target=voice_loop,
+        args=(transcriber, brain, speaker, memory, state_ref),
+        daemon=True,
+    )
+    t.start()
 
     speaker.speak("VOX online.")
-    sys.exit(app.exec())
+    run_face(state_ref)   # blocks on main thread until Esc
 
 
 if __name__ == "__main__":
