@@ -26,10 +26,10 @@ COL = {
 }
 
 # Pulse amplitude per state (sphere breathes by this many px)
-AMP = {"idle": 3, "listening": 16, "thinking": 10, "speaking": 38}
+AMP = {"idle": 3, "listening": 10, "thinking": 7, "speaking": 20}
 
 # Oscillator step per frame — faster = higher frequency pulsation
-OSC_SPEED = {"idle": 0.012, "listening": 0.038, "thinking": 0.028, "speaking": 0.11}
+OSC_SPEED = {"idle": 0.012, "listening": 0.028, "thinking": 0.020, "speaking": 0.055}
 
 # Rotation speed per state (radians/frame)
 ROT_SPEED = {"idle": 0.004, "listening": 0.009, "thinking": 0.012, "speaking": 0.007}
