@@ -20,10 +20,11 @@ def main():
     speaker = Speaker()
     memory = MemoryStore()
 
-    # Pre-warm Ollama so first real response isn't cold-start slow
-    print("Warming up Ollama...")
-    _ = brain.think("hi", [])
-    print("Warm-up done.")
+    # Pre-warm Ollama (only needed for local provider)
+    if config.LLM_PROVIDER == "ollama":
+        print("Warming up Ollama...")
+        _ = brain.think("hi", [])
+        print("Warm-up done.")
 
     if config.WAKE_WORD_ENABLED:
         wake_detector = WakeWordDetector()

@@ -19,11 +19,13 @@ LLM_MAX_TOKENS = 150
 LLM_NUM_CTX = 1024
 LLM_NUM_THREADS = 8
 
-# ─── STT (faster-whisper) ────────────────────────────────────────────────────
-STT_MODEL = "tiny"           # tiny | base | small | medium | large-v3
-STT_LANGUAGE = "en"          # Set to None for auto-detect
+# ─── STT ─────────────────────────────────────────────────────────────────────
+STT_PROVIDER = "groq"                    # "groq" | "local"
+STT_GROQ_MODEL = "whisper-large-v3-turbo"  # Groq Whisper model
+STT_MODEL = "tiny"           # Local fallback: tiny | base | small | medium
+STT_LANGUAGE = "en"
 STT_DEVICE = "cpu"
-STT_COMPUTE_TYPE = "int8"    # int8 is fastest on CPU
+STT_COMPUTE_TYPE = "int8"
 
 # ─── TTS (Kokoro) ─────────────────────────────────────────────────────────────
 TTS_VOICE = "af_heart"       # Kokoro voice ID
