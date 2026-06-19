@@ -32,9 +32,9 @@ TTS_VOICE = "af_heart"       # Kokoro voice ID
 TTS_SPEED = 1.0
 
 # ─── Wake Word (openWakeWord) ─────────────────────────────────────────────────
-WAKE_WORD_MODEL = "hey_jarvis"   # openWakeWord model name
-WAKE_WORD_THRESHOLD = 0.5        # Detection confidence threshold
-WAKE_WORD_ENABLED = False        # Set True once Phase 2 is wired up
+WAKE_WORD_MODEL = "hey_jarvis"       # openWakeWord model name
+WAKE_WORD_THRESHOLD = 0.5            # Detection confidence threshold
+WAKE_WORD_ENABLED = True             # Always-on wake word
 
 # ─── Audio ────────────────────────────────────────────────────────────────────
 AUDIO_SAMPLE_RATE = 16000
