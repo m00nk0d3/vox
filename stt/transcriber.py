@@ -70,6 +70,6 @@ class Transcriber:
         segments, _ = self.model.transcribe(
             audio,
             language=config.STT_LANGUAGE,
-            beam_size=5,
+            beam_size=1,  # Greedy decoding — much faster, good enough for voice
         )
         return " ".join(seg.text.strip() for seg in segments).strip()

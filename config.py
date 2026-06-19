@@ -33,7 +33,7 @@ AUDIO_CHANNELS = 1
 
 # ─── VAD (Voice Activity Detection) ──────────────────────────────────────────
 VAD_SILENCE_THRESHOLD = 0.01   # RMS energy below this = silence
-VAD_SILENCE_DURATION = 1.2     # Seconds of silence before stopping recording
+VAD_SILENCE_DURATION = 0.8     # Seconds of silence before stopping recording
 VAD_MIN_SPEECH_DURATION = 0.3  # Ignore blips shorter than this
 VAD_MAX_DURATION = 30          # Safety cap in seconds
 

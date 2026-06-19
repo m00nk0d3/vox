@@ -19,6 +19,11 @@ def main():
     speaker = Speaker()
     memory = MemoryStore()
 
+    # Pre-warm Ollama so first real response isn't cold-start slow
+    print("Warming up Ollama...")
+    _ = brain.think("hi", [])
+    print("Warm-up done.")
+
     if config.WAKE_WORD_ENABLED:
         wake_detector = WakeWordDetector()
         print(f"Listening for wake word: '{config.WAKE_WORD_MODEL}'")
@@ -52,10 +57,11 @@ def main():
                     print(f"VOX: ", end="", flush=True)
                     first = False
                 print(sentence, end=" ", flush=True)
-                speaker.speak(sentence)
+                speaker.speak(sentence)  # non-blocking — queued immediately
                 full_response += sentence + " "
             print()
 
+            speaker.wait_until_done()  # wait for all audio to finish before next turn
             full_response = full_response.strip()
             memory.add_turn(user_text, full_response)
 
