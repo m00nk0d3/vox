@@ -4,7 +4,7 @@ All tuneable settings live here. Don't scatter magic strings.
 """
 
 # ─── LLM ──────────────────────────────────────────────────────────────────────
-LLM_MODEL = "qwen2.5:14b"               # Ollama model tag
+LLM_MODEL = "llama3.2:1b"               # Ollama model tag
 LLM_BASE_URL = "http://localhost:11434"  # Ollama server URL
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 512                     # Keep responses concise for voice
@@ -25,9 +25,12 @@ WAKE_WORD_THRESHOLD = 0.5        # Detection confidence threshold
 WAKE_WORD_ENABLED = False        # Set True once Phase 2 is wired up
 
 # ─── Audio ────────────────────────────────────────────────────────────────────
-AUDIO_SAMPLE_RATE = 16000
-AUDIO_CHANNELS = 1
-AUDIO_CHUNK_SECONDS = 5          # How many seconds to record per turn
+# ─── VAD (Voice Activity Detection) ──────────────────────────────────────────
+VAD_SILENCE_THRESHOLD = 0.01   # RMS energy below this = silence
+VAD_SILENCE_DURATION = 1.2     # Seconds of silence before stopping recording
+VAD_MIN_SPEECH_DURATION = 0.3  # Ignore blips shorter than this
+VAD_MAX_DURATION = 30          # Safety cap in seconds
+
 
 # ─── Memory ───────────────────────────────────────────────────────────────────
 MEMORY_MAX_TURNS = 20            # Short-term sliding window
