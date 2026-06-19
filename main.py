@@ -44,11 +44,20 @@ def main():
             print(f"You: {user_text}")
 
             history = memory.get_history()
-            response = brain.think(user_text, history)
-            memory.add_turn(user_text, response)
 
-            print(f"VOX: {response}")
-            speaker.speak(response)
+            full_response = ""
+            first = True
+            for sentence in brain.think_stream(user_text, history):
+                if first:
+                    print(f"VOX: ", end="", flush=True)
+                    first = False
+                print(sentence, end=" ", flush=True)
+                speaker.speak(sentence)
+                full_response += sentence + " "
+            print()
+
+            full_response = full_response.strip()
+            memory.add_turn(user_text, full_response)
 
         except KeyboardInterrupt:
             print("\nShutting down VOX. Later.")
