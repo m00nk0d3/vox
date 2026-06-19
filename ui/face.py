@@ -26,7 +26,10 @@ COL = {
 }
 
 # Pulse amplitude per state (sphere breathes by this many px)
-AMP = {"idle": 7, "listening": 16, "thinking": 10, "speaking": 32}
+AMP = {"idle": 3, "listening": 16, "thinking": 10, "speaking": 38}
+
+# Oscillator step per frame — faster = higher frequency pulsation
+OSC_SPEED = {"idle": 0.012, "listening": 0.038, "thinking": 0.028, "speaking": 0.11}
 
 # Rotation speed per state (radians/frame)
 ROT_SPEED = {"idle": 0.004, "listening": 0.009, "thinking": 0.012, "speaking": 0.007}
@@ -123,10 +126,11 @@ def run_face(state_ref: dict):
         col   = COL[state]
         amp   = AMP[state]
 
-        # Advance oscillators — different speeds for organic feel
-        ph1 = (ph1 + 0.038) % (2 * math.pi)
-        ph2 = (ph2 + 0.087) % (2 * math.pi)
-        ph3 = (ph3 + 0.053) % (2 * math.pi)
+        # Advance oscillators — speed is state-dependent
+        step = OSC_SPEED[state]
+        ph1 = (ph1 + step)           % (2 * math.pi)
+        ph2 = (ph2 + step * 2.3)     % (2 * math.pi)
+        ph3 = (ph3 + step * 3.7)     % (2 * math.pi)
 
         pulse = (
             math.sin(ph1)          * 0.50 +
