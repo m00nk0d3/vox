@@ -1,7 +1,7 @@
 """
-VOX Face — Particle constellation UI.
-120 particles connected by lines when close. State-aware behavior.
-Dark bg, violet/purple palette. Runs at 60fps via pygame/SDL2.
+VOX Face — Contained particle field.
+Particles live inside a circular boundary. State changes their behavior.
+Clean, minimal, violet/purple on near-black.
 """
 
 import math
@@ -11,63 +11,82 @@ import ctypes.wintypes
 import pygame
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-W, H      = 420, 460
-FPS       = 60
-N         = 120
-CONNECT_D = 100
+W, H        = 400, 440
+FPS         = 60
+N           = 80          # fewer = cleaner
+FIELD_R     = 140         # particles stay within this radius
+CONNECT_D   = 90          # max distance for connecting lines
 
-# ── Palette ────────────────────────────────────────────────────────────────────
 BG  = (7, 6, 14)
 COL = {
-    "idle":      (110,  50, 190),
-    "listening": (150,  80, 255),
-    "thinking":  ( 90,  30, 210),
-    "speaking":  (190, 110, 255),
+    "idle":      (100,  45, 180),
+    "listening": (140,  75, 250),
+    "thinking":  ( 80,  25, 200),
+    "speaking":  (185, 105, 255),
 }
 
 
 class Particle:
-    def __init__(self):
-        self.x  = random.uniform(40, W - 40)
-        self.y  = random.uniform(40, H - 120)
-        self.vx = random.uniform(-0.4, 0.4)
-        self.vy = random.uniform(-0.4, 0.4)
-        self.r  = random.uniform(1.5, 3.2)
-        self.a  = random.randint(130, 230)
+    def __init__(self, cx: float, cy: float):
+        # Spawn within the field
+        angle  = random.uniform(0, 2 * math.pi)
+        radius = random.uniform(0, FIELD_R * 0.9)
+        self.x  = cx + math.cos(angle) * radius
+        self.y  = cy + math.sin(angle) * radius
+        self.vx = random.uniform(-0.3, 0.3)
+        self.vy = random.uniform(-0.3, 0.3)
+        self.r  = random.uniform(1.5, 3.0)
 
     def update(self, state: str, cx: float, cy: float):
+        dx_c = cx - self.x
+        dy_c = cy - self.y
+        dist  = math.hypot(dx_c, dy_c) or 1
+
+        # ── Boundary pull — always active, scales up near edge ────────────────
+        if dist > FIELD_R * 0.75:
+            strength = ((dist - FIELD_R * 0.75) / (FIELD_R * 0.25)) * 0.12
+            self.vx += dx_c / dist * strength
+            self.vy += dy_c / dist * strength
+
+        # ── State behaviour ───────────────────────────────────────────────────
         if state == "idle":
-            self.vx += random.uniform(-0.025, 0.025)
-            self.vy += random.uniform(-0.025, 0.025)
-            self._clamp(0.55)
+            self.vx += random.uniform(-0.02, 0.02)
+            self.vy += random.uniform(-0.02, 0.02)
+            self._clamp(0.45)
+
         elif state == "listening":
-            dx, dy = cx - self.x, cy - self.y
-            d = math.hypot(dx, dy) or 1
-            self.vx += dx / d * 0.035 + (-dy / d) * 0.075
-            self.vy += dy / d * 0.035 + ( dx / d) * 0.075
-            self._clamp(2.6)
+            # Gentle orbit around center
+            self.vx += (-dy_c / dist) * 0.07
+            self.vy += ( dx_c / dist) * 0.07
+            self.vx += dx_c / dist * 0.02  # slight inward pull to keep orbit tight
+            self.vy += dy_c / dist * 0.02
+            self._clamp(2.4)
+
         elif state == "thinking":
-            dx, dy = cx - self.x, cy - self.y
-            d = math.hypot(dx, dy) or 1
-            if d > 28:
-                self.vx += dx / d * 0.08 + (-dy / d) * 0.045
-                self.vy += dy / d * 0.08 + ( dx / d) * 0.045
-            self._clamp(2.8)
+            # Tighter spiral inward
+            if dist > 20:
+                self.vx += dx_c / dist * 0.07 + (-dy_c / dist) * 0.04
+                self.vy += dy_c / dist * 0.07 + ( dx_c / dist) * 0.04
+            self._clamp(2.6)
+
         elif state == "speaking":
-            dx, dy = self.x - cx, self.y - cy
-            d = math.hypot(dx, dy) or 1
-            if d < 190:
-                f = (190 - d) / 190 * 0.18
-                self.vx += dx / d * f
-                self.vy += dy / d * f
-            self._clamp(3.2)
+            # Burst outward, boundary will pull them back
+            if dist < FIELD_R and dist > 0:
+                f = (1 - dist / FIELD_R) * 0.15
+                self.vx -= dx_c / dist * f
+                self.vy -= dy_c / dist * f
+            self._clamp(3.0)
 
         self.x += self.vx
         self.y += self.vy
-        if self.x < -20:  self.x = W + 10
-        if self.x > W+20: self.x = -10
-        if self.y < -20:  self.y = H + 10
-        if self.y > H+20: self.y = -10
+
+        # Hard clamp — nothing escapes the field + margin
+        hard_r = FIELD_R * 1.25
+        if dist > hard_r:
+            self.x = cx + dx_c / dist * hard_r
+            self.y = cy + dy_c / dist * hard_r
+            self.vx *= 0.3
+            self.vy *= 0.3
 
     def _clamp(self, mx: float):
         s = math.hypot(self.vx, self.vy)
@@ -77,22 +96,23 @@ class Particle:
 
 
 def run_face(state_ref: dict):
-    """Blocking pygame loop. state_ref is shared with the voice thread."""
     pygame.init()
     pygame.display.set_caption("VOX")
     screen     = pygame.display.set_mode((W, H), pygame.NOFRAME)
     clock      = pygame.time.Clock()
-    font_title = pygame.font.SysFont("Consolas", 16, bold=True)
-    font_state = pygame.font.SysFont("Consolas", 10)
-    font_text  = pygame.font.SysFont("Consolas", 11)
-    particles  = [Particle() for _ in range(N)]
+    font_title = pygame.font.SysFont("Consolas", 15, bold=True)
+    font_state = pygame.font.SysFont("Consolas", 9)
+    font_text  = pygame.font.SysFont("Consolas", 10)
+
+    cx     = W / 2
+    cy     = (H - 90) / 2
+    particles  = [Particle(cx, cy) for _ in range(N)]
     glow_surf  = pygame.Surface((W, H), pygame.SRCALPHA)
-    cx, cy     = W / 2, (H - 100) / 2
     phase      = 0.0
     dragging   = False
     drag_off   = (0, 0)
 
-    # Pin to top-right corner, always on top
+    # Pin top-right, always on top
     try:
         hwnd = pygame.display.get_wm_info()["window"]
         sw   = ctypes.windll.user32.GetSystemMetrics(0)
@@ -102,18 +122,19 @@ def run_face(state_ref: dict):
 
     while True:
         clock.tick(FPS)
-        phase = (phase + 0.04) % (2 * math.pi)
+        phase = (phase + 0.035) % (2 * math.pi)
         pulse = (math.sin(phase) + 1) / 2
+
         state = state_ref.get("state", "idle")
         text  = state_ref.get("text",  "")
         col   = COL[state]
 
         # ── Events ────────────────────────────────────────────────────────────
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return
+            if event.type in (pygame.QUIT,):
+                pygame.quit(); return
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                return
+                pygame.quit(); return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 dragging = True
                 drag_off = pygame.mouse.get_pos()
@@ -129,8 +150,7 @@ def run_face(state_ref: dict):
                         hwnd, -1,
                         rect.left + mx - drag_off[0],
                         rect.top  + my - drag_off[1],
-                        0, 0, 0x0001 | 0x0002
-                    )
+                        0, 0, 0x0001 | 0x0002)
                 except Exception:
                     pass
 
@@ -141,48 +161,45 @@ def run_face(state_ref: dict):
         # ── Draw ──────────────────────────────────────────────────────────────
         screen.fill(BG)
 
-        # Lines between nearby particles
+        # Connecting lines — only between particles inside the field
         for i in range(N):
             for j in range(i + 1, N):
                 pi, pj = particles[i], particles[j]
                 d = math.hypot(pi.x - pj.x, pi.y - pj.y)
                 if d < CONNECT_D:
-                    alpha = int((1 - d / CONNECT_D) * 70)
-                    c = (max(0, col[0]-30), max(0, col[1]-20), col[2], alpha)
-                    pygame.draw.line(screen, c[:3],
-                                     (int(pi.x), int(pi.y)),
-                                     (int(pj.x), int(pj.y)), 1)
+                    a = int((1 - d / CONNECT_D) * 65)
+                    pygame.draw.line(
+                        screen,
+                        (max(0, col[0]-40), max(0, col[1]-25), col[2]),
+                        (int(pi.x), int(pi.y)),
+                        (int(pj.x), int(pj.y)), 1)
 
         # Particles
         for p in particles:
-            brightness = 0.65 + pulse * 0.35
-            c = (
-                min(255, int(col[0] * brightness + 60)),
-                min(255, int(col[1] * brightness + 20)),
-                min(255, int(col[2] * brightness)),
-            )
+            b = 0.6 + pulse * 0.4
+            c = (min(255, int(col[0]*b + 50)), min(255, int(col[1]*b + 15)), min(255, col[2]))
             pygame.draw.circle(screen, c, (int(p.x), int(p.y)), max(1, int(p.r)))
 
         # Central glow
         glow_surf.fill((0, 0, 0, 0))
-        for i in range(6, 0, -1):
-            gr = int(22 + pulse * 8) + i * 9
-            ga = int((0.25 + pulse * 0.35) * (55 - i * 7))
+        for i in range(5, 0, -1):
+            gr = int(16 + pulse * 7) + i * 10
+            ga = int((0.2 + pulse * 0.4) * (50 - i * 7))
             if ga > 0:
                 pygame.draw.circle(glow_surf, (*col, ga), (int(cx), int(cy)), gr)
         screen.blit(glow_surf, (0, 0))
-        pygame.draw.circle(screen, col, (int(cx), int(cy)), int(18 + pulse * 5))
-        pygame.draw.circle(screen, (235, 210, 255), (int(cx) - 5, int(cy) - 6), 4)
+        pygame.draw.circle(screen, col, (int(cx), int(cy)), int(14 + pulse * 4))
+        pygame.draw.circle(screen, (235, 210, 255), (int(cx)-4, int(cy)-5), 3)
 
         # ── UI panel ──────────────────────────────────────────────────────────
-        panel_y = H - 100
-        pygame.draw.line(screen, (55, 30, 90), (35, panel_y), (W - 35, panel_y), 1)
+        py = H - 85
+        pygame.draw.line(screen, (45, 25, 80), (40, py), (W-40, py), 1)
 
-        title = font_title.render("V O X", True, (195, 165, 255))
-        screen.blit(title, (W // 2 - title.get_width() // 2, panel_y + 10))
+        title = font_title.render("V O X", True, (190, 160, 255))
+        screen.blit(title, (W//2 - title.get_width()//2, py + 10))
 
-        state_s = font_state.render(state.upper(), True, (95, 65, 150))
-        screen.blit(state_s, (W // 2 - state_s.get_width() // 2, panel_y + 34))
+        ss = font_state.render(state.upper(), True, (85, 55, 140))
+        screen.blit(ss, (W//2 - ss.get_width()//2, py + 32))
 
         if text:
             words, line, lines = text.split(), "", []
@@ -195,9 +212,7 @@ def run_face(state_ref: dict):
                     line = w
             if line: lines.append(line)
             for i, ln in enumerate(lines[:2]):
-                ts = font_text.render(ln, True, (140, 110, 195))
-                screen.blit(ts, (W // 2 - ts.get_width() // 2, panel_y + 52 + i * 15))
+                ts = font_text.render(ln, True, (130, 100, 185))
+                screen.blit(ts, (W//2 - ts.get_width()//2, py + 50 + i*14))
 
         pygame.display.flip()
-
-    pygame.quit()
