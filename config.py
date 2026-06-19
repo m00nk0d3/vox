@@ -4,7 +4,7 @@ All tuneable settings live here. Don't scatter magic strings.
 """
 
 # ─── LLM ──────────────────────────────────────────────────────────────────────
-LLM_MODEL = "qwen2.5:14b"               # Ollama model tag
+LLM_MODEL = "qwen2.5:7b"                # Ollama model tag
 LLM_BASE_URL = "http://localhost:11434"  # Ollama server URL
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 512                     # Keep responses concise for voice
