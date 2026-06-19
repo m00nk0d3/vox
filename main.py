@@ -3,6 +3,7 @@ VOX — Main entry point
 Runs the voice conversation loop.
 """
 
+import time
 from stt.transcriber import Transcriber
 from llm.brain import Brain
 from tts.speaker import Speaker
@@ -39,29 +40,33 @@ def main():
             else:
                 input("\n[Press Enter to speak] ")
 
+            t0 = time.time()
             print("Listening...")
             user_text = transcriber.listen()
+            t_stt = time.time()
 
             if not user_text:
                 print("Didn't catch that.")
                 continue
 
-            print(f"You: {user_text}")
+            print(f"You: {user_text}  [STT: {t_stt - t0:.1f}s]")
 
             history = memory.get_history()
 
             full_response = ""
             first = True
+            t_llm_start = time.time()
             for sentence in brain.think_stream(user_text, history):
                 if first:
-                    print(f"VOX: ", end="", flush=True)
+                    print(f"VOX [LLM first token: {time.time() - t_llm_start:.1f}s]: ", end="", flush=True)
                     first = False
                 print(sentence, end=" ", flush=True)
-                speaker.speak(sentence)  # non-blocking — queued immediately
+                speaker.speak(sentence)
                 full_response += sentence + " "
-            print()
+            t_llm_end = time.time()
+            print(f"  [LLM total: {t_llm_end - t_llm_start:.1f}s]")
 
-            speaker.wait_until_done()  # wait for all audio to finish before next turn
+            speaker.wait_until_done()
             full_response = full_response.strip()
             memory.add_turn(user_text, full_response)
 
