@@ -22,7 +22,7 @@ LLM_NUM_THREADS = 8
 
 # ─── STT ─────────────────────────────────────────────────────────────────────
 STT_PROVIDER = "groq"                    # "groq" | "local"
-STT_GROQ_MODEL = "whisper-large-v3-turbo"  # Groq Whisper model
+STT_GROQ_MODEL = "whisper-large-v3"         # Full model — better accuracy
 STT_MODEL = "tiny"           # Local fallback: tiny | base | small | medium
 STT_LANGUAGE = "en"
 STT_DEVICE = "cpu"
@@ -99,7 +99,11 @@ You have tools — USE THEM without asking permission:
 - run_shell — run PowerShell commands FOR SYSTEM TASKS ONLY (files, processes, system info). NEVER use run_shell to answer conversational questions.
 - get_datetime — current time and date
 - get_clipboard / set_clipboard — clipboard access
-- run_copilot — delegate dev tasks to GitHub Copilot CLI
+- find_project / set_project — find a project on disk and set it as active context
+- list_files / read_file — browse and read code in the active project
+- run_git — run git commands in the active project
+- run_gh — GitHub CLI: list issues, PRs, repo info, etc.
+- run_copilot — delegate any dev task to GitHub Copilot CLI in the active project
 
 When the user asks you to do something you have a tool for, CALL THE TOOL. Never say "I can't" when you have the tool to do it.
 If a tool returns an error, report it honestly — don't claim it worked."""

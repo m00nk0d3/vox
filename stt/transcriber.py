@@ -14,8 +14,6 @@ import config
 FRAME_MS    = 30                              # ms per frame
 FRAME_SIZE  = int(config.AUDIO_SAMPLE_RATE * FRAME_MS / 1000)  # samples per frame
 VAD_AGGRESSIVENESS = 3                        # 0–3, higher = stricter speech detection
-VAD_SPEECH_CONFIRM_FRAMES = 8                 # Consecutive speech frames needed (8 × 30ms = 240ms)
-VAD_SPEECH_RMS_GATE = 0.02                    # Minimum RMS energy — filters quiet music bleed
 
 
 # Known Whisper hallucinations — discard these silently
@@ -55,10 +53,7 @@ class Transcriber:
         return text
 
     def _is_speech(self, frame: np.ndarray) -> bool:
-        """Return True if frame passes RMS gate AND WebRTC VAD detects speech."""
-        rms = float(np.sqrt(np.mean(frame ** 2)))
-        if rms < VAD_SPEECH_RMS_GATE:
-            return False  # Too quiet — music bleed or silence
+        """Return True if WebRTC VAD detects human speech in this frame."""
         pcm = (frame * 32767).astype(np.int16).tobytes()
         try:
             return self.vad.is_speech(pcm, config.AUDIO_SAMPLE_RATE)
@@ -69,10 +64,9 @@ class Transcriber:
         silence_frames_needed = int(config.VAD_SILENCE_DURATION * 1000 / FRAME_MS)
         max_speech_frames     = int(config.VAD_MAX_DURATION * 1000 / FRAME_MS)
 
-        frames              = []
-        silence_frames      = 0
-        speech_started      = False
-        consecutive_speech  = 0  # Must hit this before declaring speech started
+        frames         = []
+        silence_frames = 0
+        speech_started = False
 
         print("Waiting for speech...")
 
@@ -84,32 +78,23 @@ class Transcriber:
                 is_speech = self._is_speech(frame)
 
                 if is_speech:
-                    consecutive_speech += 1
                     if not speech_started:
-                        if consecutive_speech >= VAD_SPEECH_CONFIRM_FRAMES:
-                            print("Listening...")
-                            speech_started = True
-                            if on_speech_start:
-                                on_speech_start()
-                        else:
-                            # Still accumulating confirmation frames
-                            frames.append(frame)
-                            continue
+                        print("Listening...")
+                        speech_started = True
+                        if on_speech_start:
+                            on_speech_start()
                     silence_frames = 0
                     frames.append(frame)
 
                     if len(frames) >= max_speech_frames:
                         break
 
-                else:
-                    consecutive_speech = 0
-                    if speech_started:
-                        frames.append(frame)
-                        silence_frames += 1
-                        if silence_frames >= silence_frames_needed:
-                            break
-                    else:
-                        frames = []  # Discard pre-confirmation frames on silence
+                elif speech_started:
+                    frames.append(frame)
+                    silence_frames += 1
+                    if silence_frames >= silence_frames_needed:
+                        break
+                # else: no speech yet — wait forever
 
         if not frames:
             return np.array([], dtype=np.float32)

@@ -3,8 +3,9 @@ Tool registry — maps tool names to functions and their Groq JSON schemas.
 """
 
 from tools.system import open_app, run_shell, get_datetime, search_web, get_clipboard, set_clipboard
-from tools.copilot import run_copilot
+from tools.copilot import run_copilot as _run_copilot_legacy
 from tools.spotify import spotify_play, spotify_pause, spotify_resume, spotify_next, spotify_previous, spotify_volume, spotify_now_playing
+from tools.dev import find_project, set_project, list_files, read_file, run_git, run_gh, run_copilot, get_project
 
 # ── Executor ──────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,6 @@ TOOL_FUNCTIONS = {
     "search_web":        lambda args: search_web(args["query"]),
     "get_clipboard":     lambda args: get_clipboard(),
     "set_clipboard":     lambda args: set_clipboard(args["text"]),
-    "run_copilot":       lambda args: run_copilot(args["task"]),
     "spotify_play":      lambda args: spotify_play(args["query"]),
     "spotify_pause":     lambda args: spotify_pause(),
     "spotify_resume":    lambda args: spotify_resume(),
@@ -23,6 +23,13 @@ TOOL_FUNCTIONS = {
     "spotify_previous":  lambda args: spotify_previous(),
     "spotify_volume":    lambda args: spotify_volume(int(args["level"])),
     "spotify_now_playing": lambda args: spotify_now_playing(),
+    "find_project":      lambda args: find_project(args["name"]),
+    "set_project":       lambda args: set_project(args["path"]),
+    "list_files":        lambda args: list_files(args.get("subpath", "")),
+    "read_file":         lambda args: read_file(args["file_path"]),
+    "run_git":           lambda args: run_git(args["command"]),
+    "run_gh":            lambda args: run_gh(args["command"]),
+    "run_copilot":       lambda args: run_copilot(args["task"]),
 }
 
 
@@ -191,6 +198,103 @@ TOOLS_SCHEMA = [
             "name": "spotify_now_playing",
             "description": "Get what's currently playing on Spotify.",
             "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_project",
+            "description": "Search the user's disks for a project folder by name and set it as the active project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name or partial name to search for"}
+                },
+                "required": ["name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_project",
+            "description": "Set the active project to a specific path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Full path to the project directory"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List files and folders in the active project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subpath": {"type": "string", "description": "Optional subdirectory to list (relative to project root)"}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the contents of a file in the active project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "File path (relative to project root or absolute)"}
+                },
+                "required": ["file_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_git",
+            "description": "Run a git command in the active project (e.g. 'status', 'log --oneline -10', 'diff').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Git subcommand and args (without the 'git' prefix)"}
+                },
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_gh",
+            "description": "Run a GitHub CLI command in the active project (e.g. 'issue list', 'pr list', 'repo view').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "gh subcommand and args (without the 'gh' prefix)"}
+                },
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_copilot",
+            "description": "Delegate a software development task to GitHub Copilot CLI in the active project. Use for writing code, fixing bugs, creating files, git operations, or any dev task.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "Natural language description of the dev task"}
+                },
+                "required": ["task"]
+            }
         }
     },
 ]

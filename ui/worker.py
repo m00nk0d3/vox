@@ -130,6 +130,21 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
                 # Execute tool and get spoken follow-up
                 if pending_tool:
                     print(f"\n[Tool] {pending_tool.name}({pending_tool.args})")
+
+                    # Speak a heads-up for slow tools
+                    slow_tools = {"run_copilot", "find_project", "run_git", "run_gh", "run_shell"}
+                    if pending_tool.name in slow_tools:
+                        headsup = {
+                            "run_copilot": "on it, passing this to Copilot now",
+                            "find_project": "searching your drives for that project",
+                            "run_git": "checking git",
+                            "run_gh": "hitting GitHub",
+                            "run_shell": "running that",
+                        }.get(pending_tool.name, "working on it")
+                        speaker.speak(headsup)
+                        state_ref.update({"state": "thinking", "text": headsup})
+                        speaker.wait_until_done()
+
                     state_ref.update({"state": "thinking", "text": f"running {pending_tool.name}…"})
                     result = execute_tool(pending_tool.name, pending_tool.args)
                     print(f"[Tool result] {result}")
