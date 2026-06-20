@@ -68,14 +68,42 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
             t_llm         = time.time()
 
             try:
-                for sentence in brain.think_stream(user_text, history):
+                from llm.brain import ToolCall
+                from tools.registry import execute_tool
+
+                tool_call_id = "call_0"
+                pending_tool = None
+
+                for item in brain.think_stream(user_text, history):
+                    if isinstance(item, ToolCall):
+                        pending_tool = item
+                        continue
                     if first:
                         print(f"VOX [first token: {time.time() - t_llm:.1f}s]: ", end="", flush=True)
                         first = False
-                    print(sentence, end=" ", flush=True)
-                    state_ref.update({"state": "speaking", "text": sentence})
-                    speaker.speak(sentence)
-                    full_response += sentence + " "
+                    print(item, end=" ", flush=True)
+                    state_ref.update({"state": "speaking", "text": item})
+                    speaker.speak(item)
+                    full_response += item + " "
+
+                # Execute tool and get spoken follow-up
+                if pending_tool:
+                    print(f"\n[Tool] {pending_tool.name}({pending_tool.args})")
+                    state_ref.update({"state": "thinking", "text": f"running {pending_tool.name}…"})
+                    result = execute_tool(pending_tool.name, pending_tool.args)
+                    print(f"[Tool result] {result}")
+
+                    for sentence in brain.think_with_tool_result(
+                        user_text, history, pending_tool.name, tool_call_id, result
+                    ):
+                        if first:
+                            print(f"VOX [tool reply: {time.time() - t_llm:.1f}s]: ", end="", flush=True)
+                            first = False
+                        print(sentence, end=" ", flush=True)
+                        state_ref.update({"state": "speaking", "text": sentence})
+                        speaker.speak(sentence)
+                        full_response += sentence + " "
+
             except Exception as e:
                 err = str(e)
                 if "rate_limit" in err.lower() or "429" in err:
