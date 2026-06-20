@@ -35,15 +35,21 @@ def _client() -> spotipy.Spotify:
 
 
 def _active_device_id() -> str | None:
-    """Return the first active device ID, or None."""
+    """Return the first active device ID, falling back to any available device."""
     devices = _client().devices()
     devs = devices.get("devices", [])
-    # Prefer active device
     for d in devs:
         if d["is_active"]:
             return d["id"]
-    # Fall back to first available
-    return devs[0]["id"] if devs else None
+    # No active device — transfer playback to the first available
+    if devs:
+        device_id = devs[0]["id"]
+        try:
+            _client().transfer_playback(device_id, force_play=False)
+        except Exception:
+            pass
+        return device_id
+    return None
 
 
 def spotify_play(query: str) -> str:
@@ -76,16 +82,25 @@ def spotify_play(query: str) -> str:
 def spotify_pause() -> str:
     """Pause Spotify playback."""
     try:
-        _client().pause_playback()
+        device_id = _active_device_id()
+        if not device_id:
+            return "No active Spotify device found."
+        _client().pause_playback(device_id=device_id)
         return "Paused."
     except Exception as e:
+        err = str(e)
+        if "403" in err or "Restriction violated" in err:
+            return "Can't pause — no active device or playback isn't controllable right now."
         return f"Couldn't pause: {e}"
 
 
 def spotify_resume() -> str:
     """Resume Spotify playback."""
     try:
-        _client().start_playback()
+        device_id = _active_device_id()
+        if not device_id:
+            return "No active Spotify device found."
+        _client().start_playback(device_id=device_id)
         return "Resumed."
     except Exception as e:
         return f"Couldn't resume: {e}"
@@ -94,7 +109,8 @@ def spotify_resume() -> str:
 def spotify_next() -> str:
     """Skip to the next track."""
     try:
-        _client().next_track()
+        device_id = _active_device_id()
+        _client().next_track(device_id=device_id)
         return "Skipped to next track."
     except Exception as e:
         return f"Couldn't skip: {e}"
@@ -103,7 +119,8 @@ def spotify_next() -> str:
 def spotify_previous() -> str:
     """Go back to the previous track."""
     try:
-        _client().previous_track()
+        device_id = _active_device_id()
+        _client().previous_track(device_id=device_id)
         return "Going back."
     except Exception as e:
         return f"Couldn't go back: {e}"

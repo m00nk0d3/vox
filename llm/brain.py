@@ -51,9 +51,11 @@ class Brain:
         if config.LLM_PROVIDER == "groq":
             from tools.registry import TOOLS_SCHEMA
 
-            # ── First pass: detect tool calls (non-streaming) ────────────────
+            # Single call — tool detection + conversation in one shot.
+            # If the model returns tool_calls, execute them.
+            # If it returns text content, use it directly (no second call).
             response = self.client.chat.completions.create(
-                model=config.LLM_TOOL_MODEL,  # tool-use fine-tuned model
+                model=self.model,
                 messages=messages,
                 tools=TOOLS_SCHEMA,
                 tool_choice="auto",
@@ -63,7 +65,6 @@ class Brain:
             msg = response.choices[0].message
 
             if msg.tool_calls:
-                # Yield tool calls — worker will execute and call back
                 for tc in msg.tool_calls:
                     yield ToolCall(
                         name=tc.function.name,
@@ -71,16 +72,10 @@ class Brain:
                     )
                 return
 
-            # ── No tool call — stream the text response ───────────────────
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                stream=True,
-                temperature=config.LLM_TEMPERATURE,
-                max_tokens=config.LLM_MAX_TOKENS,
-            )
-            yield from self._stream_sentences(stream)
-
+            # No tool call — yield the text content directly
+            if msg.content:
+                yield from self._split_sentences(msg.content)
+            return
         else:
             stream = self.client.chat(
                 model=self.model,
@@ -133,6 +128,14 @@ class Brain:
             max_tokens=40,  # short confirmation only
         )
         yield from self._stream_sentences(stream)
+
+    def _split_sentences(self, text: str):
+        """Split a complete text string into sentences for TTS."""
+        parts = SENTENCE_END.split(text)
+        for sentence in parts:
+            sentence = sentence.strip()
+            if sentence:
+                yield sentence
 
     def _stream_sentences(self, stream):
         buffer = ""

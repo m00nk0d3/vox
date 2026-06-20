@@ -29,7 +29,8 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
             sp = spotify_client()
             pb = sp.current_playback()
             if pb and pb.get("is_playing"):
-                sp.pause_playback()
+                device_id = _active_device_id()
+                sp.pause_playback(device_id=device_id)
                 return True
         except Exception:
             pass
@@ -39,7 +40,8 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
         if not _spotify_available or not was_playing:
             return
         try:
-            spotify_client().start_playback()
+            device_id = _active_device_id()
+            spotify_client().start_playback(device_id=device_id)
         except Exception:
             pass
 
@@ -63,15 +65,22 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
         while session_active:
             state_ref.update({"state": "listening", "text": ""})
 
-            # Pause Spotify so mic doesn't pick up music
-            was_playing = spotify_pause_if_playing()
+            # Only pause Spotify the moment speech is actually detected
+            was_playing = False
+            def on_speech_start():
+                nonlocal was_playing
+                was_playing = spotify_pause_if_playing()
 
             t0        = time.time()
-            user_text = transcriber.listen()
+            user_text = transcriber.listen(on_speech_start=on_speech_start)
             elapsed   = time.time() - t0
 
             if not user_text:
-                # No speech detected — wait for TTS to finish, then go idle
+                # If speech was detected but filtered (hallucination), stay in session
+                if elapsed > 0.5:
+                    spotify_resume_if_was_playing(was_playing)
+                    continue  # Keep listening, don't go idle
+                # True silence — go idle
                 speaker.wait_until_done()
                 print("No speech detected, going idle.")
                 go_idle()
@@ -151,6 +160,13 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
                 continue
 
             print(f"\n  [LLM total: {time.time() - t_llm:.1f}s]")
+
+            # Fallback if model returned nothing
+            if not full_response.strip():
+                fallback = "I got nothing on that one."
+                speaker.speak(fallback)
+                full_response = fallback
+
             speaker.wait_until_done()
             memory.add_turn(user_text, full_response.strip())
 
