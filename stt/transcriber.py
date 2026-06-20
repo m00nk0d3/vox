@@ -39,19 +39,17 @@ class Transcriber:
         sample_rate = config.AUDIO_SAMPLE_RATE
         chunk_size  = int(sample_rate * CHUNK_SECONDS)
         silence_chunks_needed = int(config.VAD_SILENCE_DURATION / CHUNK_SECONDS)
-        idle_chunks_max       = int(config.VAD_IDLE_TIMEOUT / CHUNK_SECONDS)
-        max_chunks            = int(config.VAD_MAX_DURATION / CHUNK_SECONDS)
+        max_speech_chunks     = int(config.VAD_MAX_DURATION / CHUNK_SECONDS)
 
         frames         = []
         silence_chunks = 0
-        idle_chunks    = 0
         speech_started = False
 
         print("Waiting for speech...")
 
         with sd.InputStream(samplerate=sample_rate, channels=1, dtype="float32") as stream:
-            for _ in range(max_chunks):
-                chunk, _  = stream.read(chunk_size)
+            while True:
+                chunk, _   = stream.read(chunk_size)
                 chunk_flat = chunk.flatten()
                 rms        = float(np.sqrt(np.mean(chunk_flat ** 2)))
 
@@ -60,19 +58,18 @@ class Transcriber:
                         print("Listening...")
                         speech_started = True
                     silence_chunks = 0
-                    idle_chunks    = 0
                     frames.append(chunk_flat)
+
+                    # Cap recording at max duration
+                    if len(frames) >= max_speech_chunks:
+                        break
+
                 elif speech_started:
                     frames.append(chunk_flat)
                     silence_chunks += 1
                     if silence_chunks >= silence_chunks_needed:
                         break
-                else:
-                    # No speech yet — count toward idle timeout
-                    idle_chunks += 1
-                    if idle_chunks >= idle_chunks_max:
-                        print("Idle timeout — going to sleep.")
-                        return np.array([], dtype=np.float32)
+                # else: no speech yet — wait forever (sleep command controls idle)
 
         if not frames:
             return np.array([], dtype=np.float32)

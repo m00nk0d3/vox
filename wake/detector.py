@@ -21,8 +21,15 @@ class WakeWordDetector:
         self.audio = pyaudio.PyAudio()
         print("Wake word ready. Say 'hey Jarvis' to activate VOX.")
 
-    def wait_for_wake_word(self):
-        """Block until the wake word is detected above threshold."""
+    def wait_for_wake_word(self, cooldown: float = 2.0):
+        """Block until the wake word is detected above threshold.
+        
+        cooldown: seconds to drain stale audio before listening (prevents
+        TTS bleed from immediately re-triggering detection).
+        """
+        # Reset model state so previous audio scores don't carry over
+        self.model.reset()
+
         stream = self.audio.open(
             rate=config.AUDIO_SAMPLE_RATE,
             channels=1,
@@ -31,6 +38,11 @@ class WakeWordDetector:
             frames_per_buffer=CHUNK,
         )
         try:
+            # Drain stale mic buffer during cooldown without scoring
+            drain_chunks = int(cooldown * config.AUDIO_SAMPLE_RATE / CHUNK)
+            for _ in range(drain_chunks):
+                stream.read(CHUNK, exception_on_overflow=False)
+
             while True:
                 raw  = stream.read(CHUNK, exception_on_overflow=False)
                 data = np.frombuffer(raw, dtype=np.int16)

@@ -4,6 +4,7 @@ After wake word, stays active for ACTIVE_TIMEOUT seconds of silence.
 """
 
 import time
+import re
 import threading
 
 
@@ -38,13 +39,27 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
             elapsed   = time.time() - t0
 
             if not user_text:
-                # No speech detected — go idle, require wake word again
+                # No speech detected — wait for TTS to finish, then go idle
+                speaker.wait_until_done()
                 print("No speech detected, going idle.")
                 go_idle()
                 session_active = False
                 continue
 
             print(f"You: {user_text}  [STT: {elapsed:.1f}s]")
+
+            # Sleep on command — short, direct intent only (long sentences are questions, not commands)
+            is_short = len(user_text.split()) <= 8
+            if is_short and any(re.search(p, user_text.lower()) for p in config.SLEEP_COMMANDS):
+                state_ref.update({"state": "speaking", "text": ""})
+                for sentence in brain.think_stream(user_text, memory.get_history()):
+                    speaker.speak(sentence)
+                    state_ref.update({"state": "speaking", "text": sentence})
+                speaker.wait_until_done()
+                go_idle()
+                session_active = False
+                continue
+
             state_ref.update({"state": "thinking", "text": user_text})
 
             history       = memory.get_history()
