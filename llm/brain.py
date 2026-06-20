@@ -74,6 +74,11 @@ class Brain:
 
             # No tool call — yield the text content directly
             if msg.content:
+                # Detect if model output a tool call as plain text (fallback)
+                text_tool = self._parse_text_tool_call(msg.content)
+                if text_tool:
+                    yield text_tool
+                    return
                 yield from self._split_sentences(msg.content)
             return
         else:
@@ -128,6 +133,23 @@ class Brain:
             max_tokens=40,  # short confirmation only
         )
         yield from self._stream_sentences(stream)
+
+    def _parse_text_tool_call(self, text: str) -> "ToolCall | None":
+        """Detect when a model outputs a tool call as plain text like run_copilot('task')."""
+        import re
+        from tools.registry import TOOL_FUNCTIONS
+        # Match: tool_name("args") or tool_name({'key': 'value'})
+        m = re.match(r'^(\w+)\s*\(\s*["\']?(.+?)["\']?\s*\)\s*$', text.strip(), re.DOTALL)
+        if m:
+            name, arg = m.group(1), m.group(2)
+            if name in TOOL_FUNCTIONS:
+                # Build args dict based on tool — use generic 'task'/'query'/'command' keys
+                arg_keys = {"run_copilot": "task", "run_gh": "command", "run_git": "command",
+                            "search_web": "query", "open_app": "app_name", "run_shell": "command",
+                            "find_project": "name", "spotify_play": "query"}
+                key = arg_keys.get(name, "task")
+                return ToolCall(name=name, args={key: arg})
+        return None
 
     def _split_sentences(self, text: str):
         """Split a complete text string into sentences for TTS."""

@@ -73,13 +73,17 @@ def find_project(name: str) -> str:
     if not matches:
         return f"No project matching '{name}' found on any drive."
 
-    set_project(matches[0])
+    # Prefer matches that contain a .git folder (actual repos)
+    git_repos = [m for m in matches if os.path.exists(os.path.join(m, ".git"))]
+    best = git_repos[0] if git_repos else matches[0]
+
+    set_project(best)
     if len(matches) == 1:
-        return f"Found and set active project: {matches[0]}"
+        return f"Found and set active project: {best}"
 
     result = f"Found {len(matches)} matches for '{name}':\n"
     result += "\n".join(f"  {i+1}. {p}" for i, p in enumerate(matches))
-    result += f"\nActive project set to: {matches[0]}"
+    result += f"\nActive project set to: {best}"
     return result
 
 
@@ -140,7 +144,8 @@ def _run(cmd: list[str], cwd: str | None = None) -> str:
     cwd = cwd or get_project()
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30, cwd=cwd
+            cmd, capture_output=True, text=True, timeout=30, cwd=cwd,
+            encoding="utf-8", errors="replace"
         )
         output = (result.stdout or result.stderr or "").strip()
         return output[:800] if output else "(no output)"
@@ -148,6 +153,25 @@ def _run(cmd: list[str], cwd: str | None = None) -> str:
         return "Command timed out."
     except Exception as e:
         return f"Error: {e}"
+
+
+def _get_repo() -> str | None:
+    """Auto-detect GitHub repo from active project's git remote."""
+    cwd = get_project()
+    if not cwd:
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True, cwd=cwd
+        )
+        url = result.stdout.strip()
+        # Parse github.com/owner/repo from https or ssh URL
+        import re
+        m = re.search(r"github\.com[:/](.+?/[^/]+?)(?:\.git)?$", url)
+        return m.group(1) if m else None
+    except Exception:
+        return None
 
 
 def run_git(command: str) -> str:
@@ -159,10 +183,17 @@ def run_git(command: str) -> str:
 
 
 def run_gh(command: str) -> str:
-    """Run a GitHub CLI command in the active project."""
+    """Run a GitHub CLI command in the active project, auto-detecting the repo."""
     if not get_project():
         return "No active project. Say 'find project X' first."
+    
+    # Auto-inject --repo if not already specified
+    repo = _get_repo()
     args = command.split()
+    if repo and "--repo" not in command and "-R" not in command:
+        # Insert --repo after the subcommand (e.g. 'issue list' -> 'issue list --repo owner/repo')
+        args = args + ["--repo", repo]
+    
     return _run(["gh"] + args)
 
 
@@ -178,6 +209,8 @@ def run_copilot(task: str) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=cwd,
         )
         lines = []
