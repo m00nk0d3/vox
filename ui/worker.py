@@ -15,6 +15,34 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
         from wake.detector import WakeWordDetector
         detector = WakeWordDetector()
 
+    # Spotify handle for pause/resume around listening
+    try:
+        from tools.spotify import _client as spotify_client, _active_device_id
+        _spotify_available = True
+    except Exception:
+        _spotify_available = False
+
+    def spotify_pause_if_playing():
+        if not _spotify_available:
+            return False
+        try:
+            sp = spotify_client()
+            pb = sp.current_playback()
+            if pb and pb.get("is_playing"):
+                sp.pause_playback()
+                return True
+        except Exception:
+            pass
+        return False
+
+    def spotify_resume_if_was_playing(was_playing: bool):
+        if not _spotify_available or not was_playing:
+            return
+        try:
+            spotify_client().start_playback()
+        except Exception:
+            pass
+
     idle_text = "say hey jarvis" if config.WAKE_WORD_ENABLED else "press enter"
 
     def go_idle():
@@ -34,6 +62,10 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
         session_active = True
         while session_active:
             state_ref.update({"state": "listening", "text": ""})
+
+            # Pause Spotify so mic doesn't pick up music
+            was_playing = spotify_pause_if_playing()
+
             t0        = time.time()
             user_text = transcriber.listen()
             elapsed   = time.time() - t0
@@ -122,7 +154,7 @@ def voice_loop(transcriber, brain, speaker, memory, state_ref: dict):
             speaker.wait_until_done()
             memory.add_turn(user_text, full_response.strip())
 
-            # After responding, give a short window to keep talking
-            # VAD will handle the actual silence — if nothing is said,
-            # listen() returns empty and we exit the session
+            # Resume Spotify if it was playing before we interrupted
+            spotify_resume_if_was_playing(was_playing)
+
             state_ref.update({"state": "listening", "text": "..."})

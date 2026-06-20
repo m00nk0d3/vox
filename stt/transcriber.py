@@ -1,19 +1,25 @@
 """
-STT module — records via VAD, transcribes via Groq Whisper API or local faster-whisper.
+STT module — records via WebRTC VAD (speech-only), transcribes via Groq Whisper API or local faster-whisper.
+WebRTC VAD ignores music/noise and only triggers on human voice.
 """
 
 import io
 import wave
-import tempfile
+import webrtcvad
 import sounddevice as sd
 import numpy as np
 import config
 
-CHUNK_SECONDS = 0.1
+# WebRTC VAD requires 10ms, 20ms, or 30ms frames at 16kHz
+FRAME_MS    = 30                              # ms per frame
+FRAME_SIZE  = int(config.AUDIO_SAMPLE_RATE * FRAME_MS / 1000)  # samples per frame
+VAD_AGGRESSIVENESS = 3                        # 0–3, higher = stricter speech detection
 
 
 class Transcriber:
     def __init__(self):
+        self.vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
+
         if config.STT_PROVIDER == "groq":
             from groq import Groq
             self.client = Groq(api_key=config.GROQ_API_KEY)
@@ -35,41 +41,47 @@ class Transcriber:
             return self._transcribe_groq(audio)
         return self._transcribe_local(audio)
 
+    def _is_speech(self, frame: np.ndarray) -> bool:
+        """Return True if WebRTC VAD detects human speech in this frame."""
+        pcm = (frame * 32767).astype(np.int16).tobytes()
+        try:
+            return self.vad.is_speech(pcm, config.AUDIO_SAMPLE_RATE)
+        except Exception:
+            return False
+
     def _record_until_silence(self) -> np.ndarray:
-        sample_rate = config.AUDIO_SAMPLE_RATE
-        chunk_size  = int(sample_rate * CHUNK_SECONDS)
-        silence_chunks_needed = int(config.VAD_SILENCE_DURATION / CHUNK_SECONDS)
-        max_speech_chunks     = int(config.VAD_MAX_DURATION / CHUNK_SECONDS)
+        silence_frames_needed = int(config.VAD_SILENCE_DURATION * 1000 / FRAME_MS)
+        max_speech_frames     = int(config.VAD_MAX_DURATION * 1000 / FRAME_MS)
 
         frames         = []
-        silence_chunks = 0
+        silence_frames = 0
         speech_started = False
 
         print("Waiting for speech...")
 
-        with sd.InputStream(samplerate=sample_rate, channels=1, dtype="float32") as stream:
+        with sd.InputStream(samplerate=config.AUDIO_SAMPLE_RATE, channels=1, dtype="float32") as stream:
             while True:
-                chunk, _   = stream.read(chunk_size)
-                chunk_flat = chunk.flatten()
-                rms        = float(np.sqrt(np.mean(chunk_flat ** 2)))
+                chunk, _ = stream.read(FRAME_SIZE)
+                frame    = chunk.flatten()
 
-                if rms > config.VAD_SILENCE_THRESHOLD:
+                is_speech = self._is_speech(frame)
+
+                if is_speech:
                     if not speech_started:
                         print("Listening...")
                         speech_started = True
-                    silence_chunks = 0
-                    frames.append(chunk_flat)
+                    silence_frames = 0
+                    frames.append(frame)
 
-                    # Cap recording at max duration
-                    if len(frames) >= max_speech_chunks:
+                    if len(frames) >= max_speech_frames:
                         break
 
                 elif speech_started:
-                    frames.append(chunk_flat)
-                    silence_chunks += 1
-                    if silence_chunks >= silence_chunks_needed:
+                    frames.append(frame)
+                    silence_frames += 1
+                    if silence_frames >= silence_frames_needed:
                         break
-                # else: no speech yet — wait forever (sleep command controls idle)
+                # else: no speech yet — wait forever
 
         if not frames:
             return np.array([], dtype=np.float32)
@@ -81,7 +93,7 @@ class Transcriber:
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(1)
-            wf.setsampwidth(2)  # 16-bit
+            wf.setsampwidth(2)
             wf.setframerate(config.AUDIO_SAMPLE_RATE)
             wf.writeframes(pcm.tobytes())
         buf.seek(0)

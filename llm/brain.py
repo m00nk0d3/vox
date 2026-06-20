@@ -53,7 +53,7 @@ class Brain:
 
             # ── First pass: detect tool calls (non-streaming) ────────────────
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=config.LLM_TOOL_MODEL,  # tool-use fine-tuned model
                 messages=messages,
                 tools=TOOLS_SCHEMA,
                 tool_choice="auto",
@@ -108,7 +108,8 @@ class Brain:
 
     def think_with_tool_result(self, user_message: str, history: list[dict],
                                 tool_name: str, tool_call_id: str, tool_result: str):
-        """Stream a final response after a tool has been executed."""
+        """Stream a short spoken confirmation after a tool has been executed.
+        Keep it brief and grounded — only say what the tool result confirms."""
         messages = [{"role": "system", "content": config.SYSTEM_PROMPT}]
         messages.extend(history)
         messages.append({"role": "user", "content": user_message})
@@ -118,13 +119,18 @@ class Brain:
             "function": {"name": tool_name, "arguments": "{}"}
         }]})
         messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": tool_result})
+        messages.append({"role": "system", "content":
+            "Give a single short spoken sentence confirming what just happened. "
+            "Only say what the tool result actually confirms. Never claim something "
+            "worked if the result doesn't say so. No filler, no promises."
+        })
 
         stream = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             stream=True,
-            temperature=config.LLM_TEMPERATURE,
-            max_tokens=config.LLM_MAX_TOKENS,
+            temperature=0.5,
+            max_tokens=40,  # short confirmation only
         )
         yield from self._stream_sentences(stream)
 
