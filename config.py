@@ -4,49 +4,49 @@ All tuneable settings live here. Don't scatter magic strings.
 """
 
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ─── LLM ──────────────────────────────────────────────────────────────────────
-LLM_PROVIDER = "groq"                    # "groq" | "ollama"
-LLM_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # Conversation — independent of 70b quota
-LLM_TOOL_MODEL = "openai/gpt-oss-20b"   # Tool detection pass (reliable function calling)
-LLM_OLLAMA_MODEL = "qwen2.5:0.5b"       # Fallback local model
-LLM_BASE_URL = "http://localhost:11434"  # Ollama URL (used if provider=ollama)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+# ─── LLM (Ollama) ─────────────────────────────────────────────
+LLM_PROVIDER = "ollama"  # Local — no cloud APIs needed
+LLM_MODEL = "llama3.2:1b"  # Conversation via Ollama
+LLM_TOOL_MODEL = "llama3.2:1b"  # Tool detection via Ollama (same model)
+LLM_OLLAMA_MODEL = "qwen2.5:0.5b"  # Extra fallback local model
+LLM_BASE_URL = "http://localhost:11434"  # Ollama host
+# GROQ is removed — no API key needed
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 200
 LLM_NUM_CTX = 1024
 LLM_NUM_THREADS = 8
 
 # ─── STT ─────────────────────────────────────────────────────────────────────
-STT_PROVIDER = "groq"                    # "groq" | "local"
-STT_GROQ_MODEL = "whisper-large-v3"         # Full model — better accuracy
-STT_MODEL = "tiny"           # Local fallback: tiny | base | small | medium
+# ─── STT (local Whisper) ──────────────────────────────────────────────
+STT_PROVIDER = "local"  # faster-whisper running locally, no cloud APIs
+STT_GROQ_MODEL = "whisper-large-v3"  # kept for ref only — unused
+STT_MODEL = "base"  # Local Whisper model: tiny | base | small | medium
 STT_LANGUAGE = "en"
 STT_DEVICE = "cpu"
 STT_COMPUTE_TYPE = "int8"
 
 # ─── TTS (Kokoro) ─────────────────────────────────────────────────────────────
-TTS_VOICE = "af_heart"       # Kokoro voice ID
+TTS_VOICE = "af_heart"  # Kokoro voice ID
 TTS_SPEED = 1.0
 
 # ─── Wake Word (openWakeWord) ─────────────────────────────────────────────────
-WAKE_WORD_MODEL = "hey_jarvis"       # openWakeWord model name
-WAKE_WORD_THRESHOLD = 0.5            # Detection confidence threshold
-WAKE_WORD_ENABLED = True             # Always-on wake word
+WAKE_WORD_ENABLED = False  # Wake word requires ONNX models to be downloaded separately
 
 # ─── Audio ────────────────────────────────────────────────────────────────────
 AUDIO_SAMPLE_RATE = 16000
 AUDIO_CHANNELS = 1
 
 # ─── VAD (Voice Activity Detection) ──────────────────────────────────────────
-VAD_SILENCE_THRESHOLD = 0.01   # RMS energy below this = silence
-VAD_SILENCE_DURATION = 0.8     # Seconds of silence before stopping recording
+VAD_SILENCE_THRESHOLD = 0.01  # RMS energy below this = silence
+VAD_SILENCE_DURATION = 0.8  # Seconds of silence before stopping recording
 VAD_MIN_SPEECH_DURATION = 0.3  # Ignore blips shorter than this
-VAD_MAX_DURATION = 30          # Safety cap in seconds
-VAD_IDLE_TIMEOUT = 3600.0      # Effectively infinite — sleep only on command
+VAD_MAX_DURATION = 30  # Safety cap in seconds
+VAD_IDLE_TIMEOUT = 3600.0  # Effectively infinite — sleep only on command
 
 
 # ─── Memory ───────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ SLEEP_COMMANDS = [
 ]
 
 # ─── Memory ───────────────────────────────────────────────────────────────────
-MEMORY_MAX_TURNS = 10            # Short-term sliding window (keep it lean)
+MEMORY_MAX_TURNS = 10  # Short-term sliding window (keep it lean)
 MEMORY_FILE = "memory/vox_memory.json"
 
 # ─── Personality ──────────────────────────────────────────────────────────────

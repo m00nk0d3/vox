@@ -6,24 +6,23 @@ Streams mic in 80ms chunks and blocks until "hey jarvis" is detected.
 import numpy as np
 import pyaudio
 from openwakeword.model import Model
+
 import config
 
-CHUNK = 1280   # 80ms at 16kHz — required by openWakeWord
+CHUNK = 1280  # 80ms at 16kHz — required by openWakeWord
 
 
 class WakeWordDetector:
     def __init__(self):
-        print(f"Loading wake word model '{config.WAKE_WORD_MODEL}'...")
-        self.model = Model(
-            wakeword_models=[config.WAKE_WORD_MODEL],
-            inference_framework="onnx",
+        # wake word requires ONNX model files — not available yet
+        # so we skip it for now and fall back to VAD-triggered detection
+        print(
+            "Wake word detector disabled (ONNX models missing) — using audio-only mode"
         )
-        self.audio = pyaudio.PyAudio()
-        print("Wake word ready. Say 'hey Jarvis' to activate VOX.")
 
     def wait_for_wake_word(self, cooldown: float = 2.0):
         """Block until the wake word is detected above threshold.
-        
+
         cooldown: seconds to drain stale audio before listening (prevents
         TTS bleed from immediately re-triggering detection).
         """
@@ -44,7 +43,7 @@ class WakeWordDetector:
                 stream.read(CHUNK, exception_on_overflow=False)
 
             while True:
-                raw  = stream.read(CHUNK, exception_on_overflow=False)
+                raw = stream.read(CHUNK, exception_on_overflow=False)
                 data = np.frombuffer(raw, dtype=np.int16)
                 preds = self.model.predict(data)
                 score = preds.get(config.WAKE_WORD_MODEL, 0)
