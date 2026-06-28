@@ -23,7 +23,8 @@ LLM_NUM_THREADS = 8
 
 # ─── STT ─────────────────────────────────────────────────────────────────────
 # ─── STT (local Whisper) ──────────────────────────────────────────────
-STT_PROVIDER = "local"  # faster-whisper running locally, no cloud APIs
+# STT: uses faster-whisper (local) with ALSA + PipeWire for audio I/O
+# Audio backend note: PyAudio needs libasound-dev/libsndfile + pipewire-pulse at runtime
 STT_GROQ_MODEL = "whisper-large-v3"  # kept for ref only — unused
 STT_MODEL = "base"  # Local Whisper model: tiny | base | small | medium
 STT_LANGUAGE = "en"
